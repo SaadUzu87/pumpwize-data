@@ -15,6 +15,7 @@ import importlib
 import json
 import os
 import sys
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 
@@ -50,26 +51,33 @@ def main(argv=None) -> int:
     wanted = {s.strip().lower() for s in args.only.split(",") if s.strip()}
     index = {"v": 2, "generated": now_iso(), "countries": {}}
     failures = 0
+    summary = ["| Pays | Résultat |", "|---|---|"]
     for name in SOURCES:
         if wanted and name not in wanted:
             continue
         mod = importlib.import_module(f".sources.{name}", __package__)
         country = mod.COUNTRY
         print(f"== {country.code} ({country.source_name})", flush=True)
+        started = time.monotonic()
         try:
-            doc = mod.load()
+            doc = _load_with_retry(mod)
             stale = False
+            summary.append(f"| {country.code} | {len(doc['stations'])} stations en {time.monotonic() - started:.0f} s |")
         except (SourceError, ValueError, KeyError, TypeError) as e:
-            print(f"  ÉCHEC : {e}", flush=True)
+            reason = f"{type(e).__name__}: {str(e)[:160]}"
+            print(f"  ÉCHEC : {reason}", flush=True)
             doc = _previous(args.previous, country.code)
             stale = True
             if doc is None:
                 failures += 1
+                summary.append(f"| {country.code} | ÉCHEC, pays omis : {reason} |")
                 print("  aucune version précédente utilisable : pays omis", flush=True)
                 continue
+            summary.append(f"| {country.code} | ÉCHEC, version du {doc['generated']} conservée : {reason} |")
             print(f"  version précédente conservée ({doc['generated']})", flush=True)
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             traceback.print_exc()
+            summary.append(f"| {country.code} | ERREUR INTERNE : {type(e).__name__}: {str(e)[:160]} |")
             failures += 1
             continue
         text = dump(doc)
@@ -90,7 +98,28 @@ def main(argv=None) -> int:
     with open(os.path.join(args.out, "index.json"), "w", encoding="utf-8", newline="\n") as f:
         f.write(dump(index))
     print(f"index : {len(index['countries'])} pays, {failures} échec(s)")
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with open(summary_path, "a", encoding="utf-8") as f:
+            f.write(f"## Agrégation du {index['generated']}
+
+" + "
+".join(summary) + "
+")
     return 0 if index["countries"] else 1
+
+
+def _load_with_retry(mod, attempts: int = 2):
+    """Une source lente ou capricieuse a droit à un second essai."""
+    last = None
+    for i in range(attempts):
+        try:
+            return mod.load()
+        except SourceError as e:
+            last = e
+            print(f"  essai {i + 1}/{attempts} raté : {str(e)[:160]}", flush=True)
+            time.sleep(10)
+    raise last
 
 
 if __name__ == "__main__":

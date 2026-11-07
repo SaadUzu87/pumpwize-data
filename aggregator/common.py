@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 USER_AGENT = "PumpWize-aggregator/1.0 (+https://github.com/SaadUzu87/pumpwize)"
 COLUMNS = ("diesel", "petrol95", "e10", "premium98", "e85", "lpg")
 MAX_BYTES = 80 * 1024 * 1024
-TIMEOUT = 120
+TIMEOUT = 240
 
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _SPACES = re.compile(r"\s+")
