@@ -34,7 +34,8 @@ def _rows(data: bytes, expected: int):
 
 def load():
     stations: dict[str, Station] = {}
-    for r in _rows(fetch(ANAG), 10):
+    # Le serveur du ministère ne répond pas depuis certains réseaux : délai court.
+    for r in _rows(fetch(ANAG, timeout=60), 10):
         rid = clean(r.get("idImpianto"), 12)
         c = coord(r.get("Latitudine"), r.get("Longitudine"))
         if not rid or c is None:
@@ -42,7 +43,7 @@ def load():
         stations[rid] = Station(rid, c[0], c[1], "",
                                 title_case(clean(r.get("Comune"), 60)),
                                 title_case(clean(r.get("Indirizzo"), 100)))
-    for r in _rows(fetch(PREZZI), 5):
+    for r in _rows(fetch(PREZZI, timeout=60), 5):
         s = stations.get(clean(r.get("idImpianto"), 12))
         if s is None:
             continue
