@@ -22,8 +22,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Agréger les sources
@@ -33,9 +33,8 @@ jobs:
           python -s -m aggregator.run --out site/data
           cp aggregator/site_index.html site/index.html
           ls -la site/data
+      # Pages doit être activé une fois dans Settings > Pages (source : GitHub Actions).
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
