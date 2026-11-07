@@ -101,11 +101,8 @@ def main(argv=None) -> int:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as f:
-            f.write(f"## Agrégation du {index['generated']}
-
-" + "
-".join(summary) + "
-")
+            lines = [f"## Agrégation du {index['generated']}", "", *summary, ""]
+            f.write("\n".join(lines))
     return 0 if index["countries"] else 1
 
 
