@@ -48,6 +48,7 @@ class Station:
     address: str = ""
     prices: list = field(default_factory=lambda: [None] * len(COLUMNS))
     maj: int | None = None  # minutes Unix UTC
+    brand: str = ""         # enseigne (non publiée telle quelle ; sert au mode « brand »)
 
     def set(self, column: str, price):
         self.prices[COLUMNS.index(column)] = price
@@ -93,6 +94,29 @@ def fetch(url: str, *, timeout: int = TIMEOUT, max_bytes: int = MAX_BYTES,
         raise
     except Exception as e:  # réseau, TLS, délai
         raise SourceError(f"{type(e).__name__}: {e}") from e
+
+
+def post_json(url: str, body, *, timeout: int = TIMEOUT, max_bytes: int = MAX_BYTES):
+    """POST d'un document JSON, réponse JSON (mêmes garde-fous que fetch)."""
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST", headers={
+        "User-Agent": USER_AGENT, "Accept": "application/json",
+        "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            if r.status != 200:
+                raise SourceError(f"HTTP {r.status} pour {url}")
+            raw = r.read(max_bytes + 1)
+            if len(raw) > max_bytes:
+                raise SourceError(f"réponse trop volumineuse : {url}")
+    except SourceError:
+        raise
+    except Exception as e:  # réseau, TLS, délai
+        raise SourceError(f"{type(e).__name__}: {e}") from e
+    try:
+        return json.loads(raw.decode("utf-8-sig"))
+    except json.JSONDecodeError as e:
+        raise SourceError(f"JSON illisible : {url} ({e})") from e
 
 
 def fetch_json(url: str, **kw):
