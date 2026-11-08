@@ -30,6 +30,10 @@ OVERPASS = ("https://overpass-api.de/api/interpreter",
 # Pas de filtre admin_level : Hong Kong (admin_level 3) porte aussi ISO3166-1.
 QUERY = ('[out:json][timeout:240];area["ISO3166-1"="{cc}"]->.a;'
          '(node["amenity"="fuel"](area.a);way["amenity"="fuel"](area.a););out center tags;')
+# Territoires sans zone « ISO3166-1 » exploitable dans Overpass : emprise.
+BBOX = {"HK": "(22.15,113.82,22.57,114.45)"}
+QUERY_BBOX = ('[out:json][timeout:240];(node["amenity"="fuel"]{bbox};way["amenity"="fuel"]{bbox};);'
+              'out center tags;')
 DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "osm")
 ATTRIBUTION = "© OpenStreetMap contributors (ODbL)"
 _CC = re.compile(r"^[A-Z]{2}$")
@@ -72,7 +76,8 @@ def fetch(cc: str) -> dict:
     """Interroge Overpass et retourne la photo (non écrite)."""
     if not _CC.match(cc):
         raise ValueError(cc)
-    data = urllib.parse.urlencode({"data": QUERY.format(cc=cc)}).encode()
+    query = QUERY_BBOX.format(bbox=BBOX[cc]) if cc in BBOX else QUERY.format(cc=cc)
+    data = urllib.parse.urlencode({"data": query}).encode()
     last = None
     for url in OVERPASS:
         try:
