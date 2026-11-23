@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 25
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment2.outputs.page_url || steps.deployment3.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -34,9 +34,34 @@ jobs:
           cp aggregator/site_index.html site/index.html
           ls -la site/data
       # Pages doit être activé une fois dans Settings > Pages (source : GitHub Actions).
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
+
+      # Publication. GitHub met parfois quelques secondes à rendre visible
+      # le paquet tout juste envoyé : demandée trop tôt, la publication
+      # échoue avec « No artifacts named github-pages were found » alors que
+      # la collecte a réussi. On attend donc un peu, puis on réessaie
+      # au plus deux fois avant de déclarer un échec.
+      - name: Laisser le paquet devenir visible
+        run: sleep 10
       - id: deployment
-        uses: actions/deploy-pages@v4
+        name: Publier (essai 1)
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+      - name: Attendre avant le deuxième essai
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - id: deployment2
+        name: Publier (essai 2)
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+      - name: Attendre avant le troisième essai
+        if: steps.deployment2.outcome == 'failure'
+        run: sleep 90
+      - id: deployment3
+        name: Publier (essai 3)
+        if: steps.deployment2.outcome == 'failure'
+        uses: actions/deploy-pages@v5
